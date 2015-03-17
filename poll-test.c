@@ -72,7 +72,7 @@ void gpio_write(const int fd, const char *value)
 
 int main(int argc, char *argv[])
 {
-	struct pollfd fds[] = {
+	struct pollfd row_pollfds[] = {
 		{gpio_open("/sys/class/gpio/gpio22/value", O_RDONLY), POLLPRI, 0},
 		{gpio_open("/sys/class/gpio/gpio27/value", O_RDONLY), POLLPRI, 0},
 		{gpio_open("/sys/class/gpio/gpio26/value", O_RDONLY), POLLPRI, 0},
@@ -99,7 +99,7 @@ int main(int argc, char *argv[])
 	// Process messages forever
 	while (true) {
 		// Listen for changes
-		const int ret = poll(fds, ARRAY_LENGTH(fds), stable ? -1 : debounce_ms);
+		const int ret = poll(row_pollfds, ARRAY_LENGTH(row_pollfds), stable ? -1 : debounce_ms);
 		if (ret == -1) {
 			err(5,"Error while polling");
 		} else if (ret == 0) {
@@ -111,9 +111,9 @@ int main(int argc, char *argv[])
 			bounces++;
 
 			// Clean poll state
-			FOR_EACH(i, fds) {
-				if (fds[i].revents & POLLPRI) {
-					gpio_read(fds[i].fd);
+			FOR_EACH(i, row_pollfds) {
+				if (row_pollfds[i].revents & POLLPRI) {
+					gpio_read(row_pollfds[i].fd);
 					break;
 				}
 			}
@@ -134,8 +134,8 @@ int main(int argc, char *argv[])
 				}
 				
 				// Scan
-				FOR_EACH(row, fds) {
-					char value = gpio_read(fds[row].fd);
+				FOR_EACH(row, row_pollfds) {
+					char value = gpio_read(row_pollfds[row].fd);
 					printf("%c", value);
 				}
 			}
