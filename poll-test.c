@@ -68,6 +68,7 @@ void gpio_write(const int fd, const char *value)
 }
 
 #define ARRAY_LENGTH(array) (sizeof((array))/sizeof((array)[0]))
+#define FOR_EACH(i,array) for (int i=0; i<ARRAY_LENGTH(array); i++)
 
 int main(int argc, char *argv[])
 {
@@ -77,14 +78,12 @@ int main(int argc, char *argv[])
 		{gpio_open("/sys/class/gpio/gpio26/value", O_RDONLY), POLLPRI, 0},
 		{gpio_open("/sys/class/gpio/gpio24/value", O_RDONLY), POLLPRI, 0},
 	};
-	const int fds_n = ARRAY_LENGTH(fds);
 
 	const int col_dir_fds[] = {
 		gpio_open("/sys/class/gpio/gpio23/direction", O_WRONLY),
 		gpio_open("/sys/class/gpio/gpio21/direction", O_WRONLY),
 		gpio_open("/sys/class/gpio/gpio25/direction", O_WRONLY)
 	};
-	const int col_dir_fds_n = ARRAY_LENGTH(col_dir_fds);
 
 	const int row_edge_fds[] = {
 		gpio_open("/sys/class/gpio/gpio22/edge", O_WRONLY),
@@ -92,7 +91,6 @@ int main(int argc, char *argv[])
 		gpio_open("/sys/class/gpio/gpio26/edge", O_WRONLY),
 		gpio_open("/sys/class/gpio/gpio24/edge", O_WRONLY),
 	};
-	const int row_edge_fds_n = ARRAY_LENGTH(row_edge_fds);
 
 	int bounces = -1;
 	int valid = 0;
@@ -101,7 +99,7 @@ int main(int argc, char *argv[])
 	// Process messages forever
 	while (true) {
 		// Listen for changes
-		const int ret = poll(fds, fds_n, stable ? -1 : debounce_ms);
+		const int ret = poll(fds, ARRAY_LENGTH(fds), stable ? -1 : debounce_ms);
 		if (ret == -1) {
 			err(5,"Error while polling");
 		} else if (ret == 0) {
@@ -115,20 +113,20 @@ int main(int argc, char *argv[])
 
 		if (stable) {
 			// Turn off interrupts
-			for (int col=0; col < row_edge_fds_n; col++) {
+			FOR_EACH(col, row_edge_fds) {
 				gpio_write(row_edge_fds[col], "none\n");
 			}
 
 			// The state of buttons are stable, scan. 
 			printf("\n%5d: ",valid++);
-			for (int col=0; col < col_dir_fds_n; col++) {
+			FOR_EACH(col, col_dir_fds) {
 				// Put all pins to floating mode except current column
-				for (int other_col=0; other_col < col_dir_fds_n; other_col++) {
+				FOR_EACH(other_col, col_dir_fds) {
 					gpio_write(col_dir_fds[other_col], col == other_col ? "out\n" : "in\n");
 				}
 				
 				// Scan
-				for (int row=0; row < fds_n; row++) {
+				FOR_EACH(row, fds) {
 					char value = gpio_read(fds[row].fd);
 					printf("%c", value);
 				}
@@ -137,17 +135,17 @@ int main(int argc, char *argv[])
 			bounces = -1;
 			
 			// Reset directions
-			for (int col=0; col < col_dir_fds_n; col++) {
+			FOR_EACH(col, col_dir_fds) {
 				gpio_write(col_dir_fds[col], "out\n");
 			}
 
 			// Turn on interrupts
-			for (int col=0; col < row_edge_fds_n; col++) {
+			FOR_EACH(col, row_edge_fds) {
 				gpio_write(row_edge_fds[col], "both\n");
 			}
 		} else {
 			// Clean poll state
-			for (int i=0; i<fds_n; i++) {
+			FOR_EACH(i, fds) {
 				if (fds[i].revents & POLLPRI) {
 					gpio_read(fds[i].fd);
 					break;
