@@ -1,0 +1,3 @@
+KEYPAD_COLS="21 23 25"
+KEYPAD_ROWS="22 24 26 27"
+IODIR=/sys/class/gpio
