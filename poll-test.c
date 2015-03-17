@@ -120,13 +120,10 @@ int main(int argc, char *argv[])
 			// The state of buttons are stable, scan. 
 			printf("\n%5d: ",valid++);
 			for (int col=0; col < col_dir_fds_n; col++) {
-				// Put all pins to floating mode
+				// Put all pins to floating mode except current column
 				for (int other_col=0; other_col < col_dir_fds_n; other_col++) {
-					gpio_write(col_dir_fds[other_col], "in\n");
+					gpio_write(col_dir_fds[other_col], col == other_col ? "out\n" : "in\n");
 				}
-				
-				// Set me as output
-				gpio_write(col_dir_fds[col], "out\n");
 				
 				// Scan
 				for (int row=0; row < fds_n; row++) {
