@@ -31,7 +31,7 @@
 const int debounce_ms = 40;
 
 int gpio_open(const char *pathname, int flags);
-char gpio_read(const int fd);
+bool gpio_read(const int fd);
 void gpio_write(const int fd, const char *value);
 
 int gpio_open(const char *pathname, int flags)
@@ -41,7 +41,7 @@ int gpio_open(const char *pathname, int flags)
 	err(2,"Unable to open GPIO %s", pathname);
 }
 
-char gpio_read(const int fd)
+bool gpio_read(const int fd)
 {
 	uint8_t buf[2];
 
@@ -55,8 +55,8 @@ char gpio_read(const int fd)
 		err(3,"Error while reading from GPIO pin");
 	}
 	
-	// Return binary value ('0' or '1')
-	return buf[0];
+	// Convert '0' and '1' to boolean and return
+	return buf[0] == '1';
 }
 
 void gpio_write(const int fd, const char *value)
@@ -134,8 +134,8 @@ int main(int argc, char *argv[])
 				
 				// Scan
 				FOR_EACH(row, row_pollfds) {
-					char value = gpio_read(row_pollfds[row].fd);
-					printf("%c", value);
+					bool value = gpio_read(row_pollfds[row].fd);
+					printf("%d", value);
 				}
 			}
 			printf(" bounces: %d\n",bounces);
