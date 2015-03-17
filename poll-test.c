@@ -52,7 +52,7 @@ char gpio_read(const int fd)
 	}
 
 	int got = read(fd, buf, sizeof(buf));
-	if (got < 0) {
+	if (got != sizeof(buf)) {
 		err(3,"Error while reading from GPIO pin");
 	}
 	
@@ -61,8 +61,9 @@ char gpio_read(const int fd)
 
 void gpio_write(const int fd, const char *value)
 {
-	int got = write(fd, value, strlen(value));
-	if (got == -1) {
+	size_t len = strlen(value);
+	ssize_t wrote = write(fd, value, len);
+	if (wrote != len) {
 		err(3,"Error while writing to GPIO pin");
 	}
 }
