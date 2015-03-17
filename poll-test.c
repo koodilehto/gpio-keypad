@@ -53,7 +53,7 @@ char gpio_read(const int fd)
 
 	int got = read(fd, buf, sizeof(buf));
 	if (got < 0) {
-		err(3,"Lukuvirhe gpio:sta");
+		err(3,"Error while reading from GPIO pin");
 	}
 	
 	return buf[0];
@@ -63,7 +63,7 @@ void gpio_write(const int fd, const char *value)
 {
 	int got = write(fd, value, strlen(value));
 	if (got == -1) {
-		err(3,"Kirjoitusvirhe gpio:sta");
+		err(3,"Error while writing to GPIO pin");
 	}
 }
 
