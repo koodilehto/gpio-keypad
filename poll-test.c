@@ -79,17 +79,17 @@ int main(int argc, char *argv[])
 		{gpio_open("/sys/class/gpio/gpio24/value", O_RDONLY), POLLPRI, 0},
 	};
 
-	const int col_dir_fds[] = {
-		gpio_open("/sys/class/gpio/gpio23/direction", O_WRONLY),
-		gpio_open("/sys/class/gpio/gpio21/direction", O_WRONLY),
-		gpio_open("/sys/class/gpio/gpio25/direction", O_WRONLY)
-	};
-
 	const int row_edge_fds[] = {
 		gpio_open("/sys/class/gpio/gpio22/edge", O_WRONLY),
 		gpio_open("/sys/class/gpio/gpio27/edge", O_WRONLY),
 		gpio_open("/sys/class/gpio/gpio26/edge", O_WRONLY),
 		gpio_open("/sys/class/gpio/gpio24/edge", O_WRONLY),
+	};
+
+	const int col_dir_fds[] = {
+		gpio_open("/sys/class/gpio/gpio23/direction", O_WRONLY),
+		gpio_open("/sys/class/gpio/gpio21/direction", O_WRONLY),
+		gpio_open("/sys/class/gpio/gpio25/direction", O_WRONLY)
 	};
 
 	int bounces = -1;
