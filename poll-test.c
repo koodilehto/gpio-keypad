@@ -67,6 +67,8 @@ void gpio_write(const int fd, const char *value)
 	}
 }
 
+#define ARRAY_LENGTH(array) (sizeof((array))/sizeof((array)[0]))
+
 int main(int argc, char *argv[])
 {
 	struct pollfd fds[] = {
@@ -75,22 +77,22 @@ int main(int argc, char *argv[])
 		{gpio_open("/sys/class/gpio/gpio26/value", O_RDONLY), POLLPRI, 0},
 		{gpio_open("/sys/class/gpio/gpio24/value", O_RDONLY), POLLPRI, 0},
 	};
-	const int fds_n = sizeof(fds) / sizeof(struct pollfd);
+	const int fds_n = ARRAY_LENGTH(fds);
 
-	int col_dir_fds[] = {
+	const int col_dir_fds[] = {
 		gpio_open("/sys/class/gpio/gpio23/direction", O_WRONLY),
 		gpio_open("/sys/class/gpio/gpio21/direction", O_WRONLY),
 		gpio_open("/sys/class/gpio/gpio25/direction", O_WRONLY)
 	};
-	const int col_dir_fds_n = sizeof(col_dir_fds) / sizeof(int);
+	const int col_dir_fds_n = ARRAY_LENGTH(col_dir_fds);
 
-	int row_edge_fds[] = {
+	const int row_edge_fds[] = {
 		gpio_open("/sys/class/gpio/gpio22/edge", O_WRONLY),
 		gpio_open("/sys/class/gpio/gpio27/edge", O_WRONLY),
 		gpio_open("/sys/class/gpio/gpio26/edge", O_WRONLY),
 		gpio_open("/sys/class/gpio/gpio24/edge", O_WRONLY),
 	};
-	const int row_edge_fds_n = sizeof(row_edge_fds) / sizeof(int);
+	const int row_edge_fds_n = ARRAY_LENGTH(row_edge_fds);
 
 	int bounces = -1;
 	int valid = 0;
