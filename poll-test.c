@@ -46,26 +46,24 @@ char gpio_read(const int fd)
 	uint8_t buf[2];
 
 	// Starting from beginning
-	off_t seek_ret = lseek(fd, 0, SEEK_SET);
-	if (seek_ret != 0) {
+	if (lseek(fd, 0, SEEK_SET) != 0) {
 		err(3,"Seek failed");
 	}
 
-	int got = read(fd, buf, sizeof(buf));
-	if (got != sizeof(buf)) {
+	// Read only two bytes; binary value and newline
+	if (read(fd, buf, sizeof(buf)) != sizeof(buf)) {
 		err(3,"Error while reading from GPIO pin");
 	}
 	
+	// Return binary value ('0' or '1')
 	return buf[0];
 }
 
 void gpio_write(const int fd, const char *value)
 {
 	size_t len = strlen(value);
-	ssize_t wrote = write(fd, value, len);
-	if (wrote != len) {
-		err(3,"Error while writing to GPIO pin");
-	}
+	if (write(fd, value, len) == len) return;
+	err(3,"Error while writing to GPIO pin");
 }
 
 #define ARRAY_LENGTH(array) (sizeof((array))/sizeof((array)[0]))
