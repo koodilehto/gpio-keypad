@@ -91,9 +91,17 @@ int main(int argc, char *argv[])
 		gpio_open("/sys/class/gpio/gpio25/direction", O_WRONLY)
 	};
 
+	const char keycodes[] = "147*2580369#";
+
 	int bounces = -1;
 	int valid = 0;
 	bool stable = true;
+
+	bool old_states[ARRAY_LENGTH(keycodes)];
+	bool new_states[ARRAY_LENGTH(keycodes)];
+
+	// Initial state has no keys pressed
+	bzero(old_states, sizeof(old_states));
 
 	// Process messages forever
 	while (true) {
@@ -126,6 +134,7 @@ int main(int argc, char *argv[])
 
 			// The state of buttons are stable, scan. 
 			printf("\n%5d: ",valid++);
+			int i=0;
 			FOR_EACH(col, col_dir_fds) {
 				// Put all pins to floating mode except current column
 				FOR_EACH(other_col, col_dir_fds) {
@@ -135,11 +144,20 @@ int main(int argc, char *argv[])
 				// Scan
 				FOR_EACH(row, row_pollfds) {
 					bool value = gpio_read(row_pollfds[row].fd);
+					new_states[i++] = value;
 					printf("%d", value);
 				}
 			}
 			printf(" bounces: %d\n",bounces);
 			bounces = -1;
+
+			// Output what happened
+			FOR_EACH(i, keycodes) {
+				if (new_states[i] != old_states[i]) {
+					printf("key %c %s\n", keycodes[i], new_states[i] ? "down" : "up");
+					old_states[i] = new_states[i];
+				}
+			}
 			
 			// Reset directions
 			FOR_EACH(col, col_dir_fds) {
