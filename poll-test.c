@@ -109,6 +109,14 @@ int main(int argc, char *argv[])
 			// Bounced before timeout, not stable
 			stable = false;
 			bounces++;
+
+			// Clean poll state
+			FOR_EACH(i, fds) {
+				if (fds[i].revents & POLLPRI) {
+					gpio_read(fds[i].fd);
+					break;
+				}
+			}
 		}
 
 		if (stable) {
@@ -142,14 +150,6 @@ int main(int argc, char *argv[])
 			// Turn on interrupts
 			FOR_EACH(col, row_edge_fds) {
 				gpio_write(row_edge_fds[col], "both\n");
-			}
-		} else {
-			// Clean poll state
-			FOR_EACH(i, fds) {
-				if (fds[i].revents & POLLPRI) {
-					gpio_read(fds[i].fd);
-					break;
-				}
 			}
 		}
 	}
