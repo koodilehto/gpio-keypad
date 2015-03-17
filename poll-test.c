@@ -28,77 +28,132 @@
 #include <stdbool.h>
 #include <unistd.h>
 
-const int debounce_ms = 10;
+const int debounce_ms = 40;
 
-int open_gpio(const char *pathname);
-char take_contents(const int fd);
+int gpio_open(const char *pathname, int flags);
+char gpio_read(const int fd);
+void gpio_write(const int fd, const char *value);
 
-int open_gpio(const char *pathname)
+int gpio_open(const char *pathname, int flags)
 {
-	int dev_fd = open(pathname, O_NOCTTY|O_RDONLY);
+	int dev_fd = open(pathname, O_NOCTTY | flags);
 	if (dev_fd != -1) return dev_fd;
 	err(2,"Unable to open GPIO %s", pathname);
 }
 
-char take_contents(const int fd)
+char gpio_read(const int fd)
 {
-	uint8_t buf[3];
+	uint8_t buf[2];
 
 	// Starting from beginning
-	off_t seek_ret = lseek(fd,0,SEEK_SET);
+	off_t seek_ret = lseek(fd, 0, SEEK_SET);
 	if (seek_ret != 0) {
 		err(3,"Seek failed");
 	}
 
-	int got = read(fd,buf,sizeof(buf));
-	if (got != 2) {
+	int got = read(fd, buf, sizeof(buf));
+	if (got < 0) {
 		err(3,"Lukuvirhe gpio:sta");
 	}
 	
 	return buf[0];
 }
 
+void gpio_write(const int fd, const char *value)
+{
+	int got = write(fd, value, strlen(value));
+	if (got == -1) {
+		err(3,"Kirjoitusvirhe gpio:sta");
+	}
+}
+
 int main(int argc, char *argv[])
 {
 	struct pollfd fds[] = {
-		{open_gpio("/sys/class/gpio/gpio22/value"),POLLPRI,0},
-		{open_gpio("/sys/class/gpio/gpio27/value"),POLLPRI,0},
-		{open_gpio("/sys/class/gpio/gpio26/value"),POLLPRI,0},
-		{open_gpio("/sys/class/gpio/gpio24/value"),POLLPRI,0},
+		{gpio_open("/sys/class/gpio/gpio22/value", O_RDONLY), POLLPRI, 0},
+		{gpio_open("/sys/class/gpio/gpio27/value", O_RDONLY), POLLPRI, 0},
+		{gpio_open("/sys/class/gpio/gpio26/value", O_RDONLY), POLLPRI, 0},
+		{gpio_open("/sys/class/gpio/gpio24/value", O_RDONLY), POLLPRI, 0},
 	};
 	const int fds_n = sizeof(fds) / sizeof(struct pollfd);
 
-	int sample = 0;
+	int col_dir_fds[] = {
+		gpio_open("/sys/class/gpio/gpio23/direction", O_WRONLY),
+		gpio_open("/sys/class/gpio/gpio21/direction", O_WRONLY),
+		gpio_open("/sys/class/gpio/gpio25/direction", O_WRONLY)
+	};
+	const int col_dir_fds_n = sizeof(col_dir_fds) / sizeof(int);
+
+	int row_edge_fds[] = {
+		gpio_open("/sys/class/gpio/gpio22/edge", O_WRONLY),
+		gpio_open("/sys/class/gpio/gpio27/edge", O_WRONLY),
+		gpio_open("/sys/class/gpio/gpio26/edge", O_WRONLY),
+		gpio_open("/sys/class/gpio/gpio24/edge", O_WRONLY),
+	};
+	const int row_edge_fds_n = sizeof(row_edge_fds) / sizeof(int);
+
+	int bounces = -1;
 	int valid = 0;
 	bool stable = true;
 
 	// Process messages forever
 	while (true) {
+		// Listen for changes
 		const int ret = poll(fds, fds_n, stable ? -1 : debounce_ms);
 		if (ret == -1) {
 			err(5,"Error while polling");
 		} else if (ret == 0) {
+			// Timeout reached; considering stable
 			stable = true;
-			valid++;
 		} else {
+			// Bounced before timeout, not stable
 			stable = false;
-			sample++;
-			printf("Unstaabeli konstaapeli\n");
+			bounces++;
 		}
-		
-		char state;
-		int row;
 
-		for (int i=0; i<fds_n; i++) {
-			if (fds[i].revents & POLLPRI) {
-				row = i;
-				state = take_contents(fds[i].fd);
-				break;
-			}
-		}
-		
 		if (stable) {
-			printf("mittaus %d, kelpo %d, rivi %d, arvo %c\n", sample, valid, row, state);
+			// Turn off interrupts
+			for (int col=0; col < row_edge_fds_n; col++) {
+				gpio_write(row_edge_fds[col], "none\n");
+			}
+
+			// The state of buttons are stable, scan. 
+			printf("\n%5d: ",valid++);
+			for (int col=0; col < col_dir_fds_n; col++) {
+				// Put all pins to floating mode
+				for (int other_col=0; other_col < col_dir_fds_n; other_col++) {
+					gpio_write(col_dir_fds[other_col], "in\n");
+				}
+				
+				// Set me as output
+				gpio_write(col_dir_fds[col], "out\n");
+				
+				// Scan
+				for (int row=0; row < fds_n; row++) {
+					char value = gpio_read(fds[row].fd);
+					printf("%c", value);
+				}
+			}
+			printf(" bounces: %d\n",bounces);
+			bounces = -1;
+			
+			// Reset directions
+			for (int col=0; col < col_dir_fds_n; col++) {
+				gpio_write(col_dir_fds[col], "out\n");
+			}
+
+			// Turn on interrupts
+			for (int col=0; col < row_edge_fds_n; col++) {
+				gpio_write(row_edge_fds[col], "both\n");
+			}
+		} else {
+			// Clean poll state
+			for (int i=0; i<fds_n; i++) {
+				if (fds[i].revents & POLLPRI) {
+					gpio_read(fds[i].fd);
+					break;
+				}
+			}
 		}
 	}
 }
