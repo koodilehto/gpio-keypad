@@ -112,6 +112,7 @@ int main(int argc, char *argv[])
 		} else if (ret == 0) {
 			// Timeout reached; considering stable
 			stable = true;
+			valid++;
 		} else {
 			// Bounced before timeout, not stable
 			stable = false;
@@ -146,11 +147,17 @@ int main(int argc, char *argv[])
 			}
 
 			// Output what happened
+			bool spurious = true;
 			FOR_EACH(i, keycodes) {
 				if (new_states[i] != old_states[i]) {
-					printf("%5d: key %c %s, (%d bounces)\n", valid, keycodes[i], new_states[i] ? "down" : "up", bounces);
+					printf("%5d: key %c %s (%d bounces)\n", valid, keycodes[i], new_states[i] ? "down" : "up", bounces);
 					old_states[i] = new_states[i];
+					spurious = false;
 				}
+			}
+			if (spurious) {
+				// Sometimes no change occurs (button bounces without changing state)
+				printf("%5d: spurious bounce (%d bounces)\n", valid, bounces);
 			}
 			bounces = -1;
 			
