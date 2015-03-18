@@ -133,7 +133,6 @@ int main(int argc, char *argv[])
 			}
 
 			// The state of buttons are stable, scan. 
-			printf("\n%5d: ",valid++);
 			int i=0;
 			FOR_EACH(col, col_dir_fds) {
 				// Put all pins to floating mode except current column
@@ -143,21 +142,18 @@ int main(int argc, char *argv[])
 				
 				// Scan
 				FOR_EACH(row, row_pollfds) {
-					bool value = gpio_read(row_pollfds[row].fd);
-					new_states[i++] = value;
-					printf("%d", value);
+					new_states[i++] = gpio_read(row_pollfds[row].fd);
 				}
 			}
-			printf(" bounces: %d\n",bounces);
-			bounces = -1;
 
 			// Output what happened
 			FOR_EACH(i, keycodes) {
 				if (new_states[i] != old_states[i]) {
-					printf("key %c %s\n", keycodes[i], new_states[i] ? "down" : "up");
+					printf("%5d: key %c %s, (%d bounces)\n", valid, keycodes[i], new_states[i] ? "down" : "up", bounces);
 					old_states[i] = new_states[i];
 				}
 			}
+			bounces = -1;
 			
 			// Reset directions
 			FOR_EACH(col, col_dir_fds) {
