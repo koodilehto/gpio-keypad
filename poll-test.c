@@ -121,7 +121,6 @@ int main(int argc, char *argv[])
 			FOR_EACH(i, row_pollfds) {
 				if (row_pollfds[i].revents & POLLPRI) {
 					gpio_read(row_pollfds[i].fd);
-					break;
 				}
 			}
 		}
