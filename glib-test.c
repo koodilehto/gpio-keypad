@@ -21,37 +21,83 @@
 #include <glib.h>
 #include <err.h>
 #include <stdio.h>
-
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <linux/uinput.h>
+#include <string.h>
 
 #define VALIDATE(e) { if (e != NULL) errx(1, "Configuration file error: %s", e->message); }
 
+struct gpio {
+	int value;
+	int edge;
+	int direction;
+};
 
+struct keypad {
+	gint debounce_ms;
+	gsize rows;
+	gsize cols;
+	struct gpio *row;
+	struct gpio *col;
+	gsize keycodes;
+	gint *keycode;
+	struct uinput_user_dev uidev;
+};
+
+int gpio_open_one(char *fmt, gint value, int flags);
+void gpio_open(struct gpio *gpio, gint value);
 guint g_key_file_get_hexinteger (GKeyFile *key_file,
 				 const gchar *group_name,
 				 const gchar *key,
 				 GError **error);
+
+int gpio_open_one(char *fmt, gint value, int flags)
+{
+	// Build file name
+	char pathname[64]; // Buffer long enough to hold sysfs path
+	int written = snprintf(pathname, sizeof(pathname), fmt, value);
+	if (written < 0) errx(2,"Unknown string formatting error");
+	if (written >= sizeof(pathname)) errx(2,"String formatting error, too long line");
+
+	// Open file
+	int dev_fd = open(pathname, O_NOCTTY | flags);
+	if (dev_fd != -1) return dev_fd;
+	err(2,"Unable to open GPIO %s", pathname);
+}
+
+void gpio_open(struct gpio *gpio, gint value)
+{
+	gpio->value = gpio_open_one("/sys/class/gpio/gpio%d/value", value, O_RDWR);
+	gpio->edge = gpio_open_one("/sys/class/gpio/gpio%d/edge", value, O_WRONLY);
+	gpio->direction = gpio_open_one("/sys/class/gpio/gpio%d/direction", value, O_WRONLY);
+}
 
 guint g_key_file_get_hexinteger (GKeyFile *key_file,
 				 const gchar *group_name,
 				 const gchar *key,
 				 GError **error)
 {
-	guint val;
+	guint val=0;
 
 	// Get raw value and exit if it's invalid
 	char *raw_val = g_key_file_get_value(key_file, group_name, key, error);
 	if (*error != NULL) return 0;
 
 	// We have valid string, trying to parse hexadecimals
-	if (sscanf(raw_val, "0x%x", &val) == 1) return val;
+	int ret = sscanf(raw_val, "0x%x", &val);
+	g_free(raw_val);
 
-	// Not sure if we should do it this way but it works...
-	g_set_error (error, G_KEY_FILE_ERROR,
-		     G_KEY_FILE_ERROR_INVALID_VALUE,
-		     "Key file contains key '%s' in group '%s' "
-		     "which has a value that cannot be interpreted.",
-		     key, group_name);
-	return 0;
+	if (ret != 1) {
+		// Not sure if we should do it this way but it works...
+		g_set_error (error, G_KEY_FILE_ERROR,
+			     G_KEY_FILE_ERROR_INVALID_VALUE,
+			     "Key file contains key '%s' in group '%s' "
+			     "which has a value that cannot be interpreted.",
+			     key, group_name);
+	}
+	return val;
 }
 
 int main(int argc, char *argv[])
@@ -59,58 +105,59 @@ int main(int argc, char *argv[])
 	if (argc != 2) errx(1,"Usage %s CONFIG", argv[0]);
 
 	GKeyFile *f = g_key_file_new();
-	GError *error = NULL;
-	g_key_file_load_from_file(f, argv[1], G_KEY_FILE_NONE, &error);
-	VALIDATE(error);
+	GError *e = NULL;
+	g_key_file_load_from_file(f, argv[1], G_KEY_FILE_NONE, &e);
+	VALIDATE(e);
+
+	struct keypad *dev = g_new(struct keypad, 1);
+	bzero(&dev->uidev, sizeof(dev->uidev));
 
 	// Physical interface
 
-	gsize gpio_rows_n;
-	gint *gpio_rows = g_key_file_get_integer_list(f, "gpio", "rows", &gpio_rows_n, &error);
-	VALIDATE(error);
+	gint *gpio_row_ix = g_key_file_get_integer_list(f, "gpio", "rows", &dev->rows, &e);
+	VALIDATE(e);
 
-	gsize gpio_cols_n;
-	gint *gpio_cols = g_key_file_get_integer_list(f, "gpio", "cols", &gpio_cols_n, &error);
-	VALIDATE(error);
+	gint *gpio_col_ix = g_key_file_get_integer_list(f, "gpio", "cols", &dev->cols, &e);
+	VALIDATE(e);
 
-	guint debounce_ms = g_key_file_get_integer(f, "gpio", "debounce_ms", &error);
-	VALIDATE(error);
+	dev->debounce_ms = g_key_file_get_integer(f, "gpio", "debounce_ms", &e);
+	VALIDATE(e);
 
 	// Logical interface
 
-	char *name = g_key_file_get_string(f, "input", "name", &error);
-	VALIDATE(error);
+	char *name = g_key_file_get_string(f, "input", "name", &e);
+	VALIDATE(e);
+	memcpy(dev->uidev.name, name, UINPUT_MAX_NAME_SIZE);
+	g_free(name);
 
-	gsize keycodes_n;
-	gint *keycodes = g_key_file_get_integer_list(f, "input", "keycodes", &keycodes_n, &error);
-	VALIDATE(error);
+	dev->keycode = g_key_file_get_integer_list(f, "input", "keycodes", &dev->keycodes, &e);
+	VALIDATE(e);
 
-	guint bustype = g_key_file_get_hexinteger(f, "input", "bustype", &error);
-	VALIDATE(error);
+	dev->uidev.id.bustype = g_key_file_get_hexinteger(f, "input", "bustype", &e);
+	VALIDATE(e);
 
-	guint vendor = g_key_file_get_hexinteger(f, "input", "vendor", &error);
-	VALIDATE(error);
+	dev->uidev.id.vendor = g_key_file_get_hexinteger(f, "input", "vendor", &e);
+	VALIDATE(e);
 
-	guint product = g_key_file_get_hexinteger(f, "input", "product", &error);
-	VALIDATE(error);
+	dev->uidev.id.product = g_key_file_get_hexinteger(f, "input", "product", &e);
+	VALIDATE(e);
 
-	guint version = g_key_file_get_integer(f, "input", "version", &error);
-	VALIDATE(error);
+	dev->uidev.id.version = g_key_file_get_integer(f, "input", "version", &e);
+	VALIDATE(e);
 	
-	// Viriviri
+	// Open devices
 
-	printf("Nimi: %s\nArvo: %d\n", name, debounce_ms);
-	for (gsize i=0; i<keycodes_n; i++) {
-		printf("koodi %d\n",keycodes[i]);
+	dev->row = g_new(struct gpio, dev->rows);
+	for (gsize i=0; i<dev->rows; i++) {
+		gpio_open(dev->row+i, gpio_row_ix[i]);
 	}
+	g_free(gpio_row_ix);
 
-	for (gsize i=0; i<gpio_rows_n; i++) {
-		printf("koodia %d\n",gpio_rows[i]);
+	dev->col = g_new(struct gpio, dev->cols);
+	for (gsize i=0; i<dev->cols; i++) {
+		gpio_open(dev->col+i, gpio_col_ix[i]);
 	}
-
-	for (gsize i=0; i<gpio_cols_n; i++) {
-		printf("koodit %d\n",gpio_cols[i]);
-	}
+	g_free(gpio_col_ix);
 
 	return 0;
 }
