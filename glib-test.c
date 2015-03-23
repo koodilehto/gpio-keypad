@@ -26,6 +26,7 @@
 #include <fcntl.h>
 #include <linux/uinput.h>
 #include <string.h>
+#include <unistd.h>
 
 #define VALIDATE(e) { if (e != NULL) errx(1, "Configuration file error: %s", e->message); }
 
@@ -43,7 +44,7 @@ struct keypad {
 	struct gpio *col;
 	gsize keycodes;
 	gint *keycode;
-	struct uinput_user_dev uidev;
+	int uinput_fd;
 };
 
 int gpio_open_one(char *fmt, gint value, int flags);
@@ -110,7 +111,6 @@ int main(int argc, char *argv[])
 	VALIDATE(e);
 
 	struct keypad *dev = g_new(struct keypad, 1);
-	bzero(&dev->uidev, sizeof(dev->uidev));
 
 	// Physical interface
 
@@ -125,27 +125,57 @@ int main(int argc, char *argv[])
 
 	// Logical interface
 
-	char *name = g_key_file_get_string(f, "input", "name", &e);
-	VALIDATE(e);
-	memcpy(dev->uidev.name, name, UINPUT_MAX_NAME_SIZE);
-	g_free(name);
-
 	dev->keycode = g_key_file_get_integer_list(f, "input", "keycodes", &dev->keycodes, &e);
 	VALIDATE(e);
 
-	dev->uidev.id.bustype = g_key_file_get_hexinteger(f, "input", "bustype", &e);
+	// Linux uinput device
+
+	struct uinput_user_dev uidev;
+	bzero(&uidev, sizeof(uidev));
+
+	char *name = g_key_file_get_string(f, "input", "name", &e);
+	VALIDATE(e);
+	memcpy(uidev.name, name, UINPUT_MAX_NAME_SIZE);
+	g_free(name);
+
+	uidev.id.bustype = g_key_file_get_hexinteger(f, "input", "bustype", &e);
 	VALIDATE(e);
 
-	dev->uidev.id.vendor = g_key_file_get_hexinteger(f, "input", "vendor", &e);
+	uidev.id.vendor = g_key_file_get_hexinteger(f, "input", "vendor", &e);
 	VALIDATE(e);
 
-	dev->uidev.id.product = g_key_file_get_hexinteger(f, "input", "product", &e);
+	uidev.id.product = g_key_file_get_hexinteger(f, "input", "product", &e);
 	VALIDATE(e);
 
-	dev->uidev.id.version = g_key_file_get_integer(f, "input", "version", &e);
+	uidev.id.version = g_key_file_get_integer(f, "input", "version", &e);
 	VALIDATE(e);
-	
-	// Open devices
+
+	// Register uinput device
+
+	char *uinput_dev = g_key_file_get_string(f, "input", "uinput", &e);
+	VALIDATE(e);
+	dev->uinput_fd = open(uinput_dev, O_WRONLY | O_NONBLOCK);
+	if (dev->uinput_fd < 0) err(1,"Opening %s failed", uinput_dev);
+	g_free(dev);
+
+	if ( ioctl(dev->uinput_fd, UI_SET_EVBIT, EV_KEY) == -1 ||
+	     ioctl(dev->uinput_fd, UI_SET_EVBIT, EV_SYN) == -1 ) {
+		err(2, "Setting device flags failed");
+	}
+
+	for (gsize i=0; i<dev->keycodes; i++) {
+		if (ioctl(dev->uinput_fd, UI_SET_KEYBIT,
+			  dev->keycode[i]) == -1) {
+			err(2, "Key registration failed");
+		}
+	}
+
+	if (write(dev->uinput_fd, &uidev, sizeof(uidev)) != sizeof(uidev) ||
+	    ioctl(dev->uinput_fd, UI_DEV_CREATE) == -1) {
+		err(2, "Setting device flags failed");
+	}
+
+	// Open gpio pins
 
 	dev->row = g_new(struct gpio, dev->rows);
 	for (gsize i=0; i<dev->rows; i++) {
