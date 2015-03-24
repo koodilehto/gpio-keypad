@@ -27,14 +27,9 @@
 #include <linux/uinput.h>
 #include <string.h>
 #include <unistd.h>
+#include "gpio.h"
 
 #define VALIDATE(e) { if (e != NULL) errx(1, "Configuration file error: %s", e->message); }
-
-struct gpio {
-	int value;
-	int edge;
-	int direction;
-};
 
 struct keypad {
 	gint debounce_ms;
@@ -47,33 +42,11 @@ struct keypad {
 	int uinput_fd;
 };
 
-int gpio_open_one(char *fmt, gint value, int flags);
-void gpio_open(struct gpio *gpio, gint value);
 guint g_key_file_get_hexinteger (GKeyFile *key_file,
 				 const gchar *group_name,
 				 const gchar *key,
 				 GError **error);
 
-int gpio_open_one(char *fmt, gint value, int flags)
-{
-	// Build file name
-	char pathname[64]; // Buffer long enough to hold sysfs path
-	int written = snprintf(pathname, sizeof(pathname), fmt, value);
-	if (written < 0) errx(2,"Unknown string formatting error");
-	if (written >= sizeof(pathname)) errx(2,"String formatting error, too long line");
-
-	// Open file
-	int dev_fd = open(pathname, O_NOCTTY | flags);
-	if (dev_fd != -1) return dev_fd;
-	err(2,"Unable to open GPIO %s", pathname);
-}
-
-void gpio_open(struct gpio *gpio, gint value)
-{
-	gpio->value = gpio_open_one("/sys/class/gpio/gpio%d/value", value, O_RDWR);
-	gpio->edge = gpio_open_one("/sys/class/gpio/gpio%d/edge", value, O_WRONLY);
-	gpio->direction = gpio_open_one("/sys/class/gpio/gpio%d/direction", value, O_WRONLY);
-}
 
 guint g_key_file_get_hexinteger (GKeyFile *key_file,
 				 const gchar *group_name,
@@ -127,6 +100,14 @@ int main(int argc, char *argv[])
 
 	dev->keycode = g_key_file_get_integer_list(f, "input", "keycodes", &dev->keycodes, &e);
 	VALIDATE(e);
+
+	// Sanity checks
+	if (dev->keycodes != dev->rows * dev->cols) {
+		errx(3,"Keypad has %zd rows and %zd colums but %zd buttons. "
+		     "Make sure keycodes has %zd elements",
+		     dev->rows, dev->cols, dev->keycodes,
+		     dev->rows*dev->cols);
+	}
 
 	// Linux uinput device
 
