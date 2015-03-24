@@ -22,6 +22,8 @@
 #include <poll.h>
 #include <stdio.h>
 #include <string.h>
+#include <unistd.h>
+#include <linux/uinput.h>
 #include "keypad.h"
 
 static void keypad_interrupt_enable(struct keypad *dev);
@@ -118,17 +120,31 @@ void keypad_loop(struct keypad *dev)
 			}
 
 			// Output what happened
-			bool spurious = true;
+			gint changes = 0;
+			struct input_event ev[dev->keycodes+1];	// All buttons + EV_SYN
 			for (gsize i=0; i<dev->keycodes; i++) {
 				if (new_states[i] != old_states[i]) {
+					ev[changes].type = EV_KEY;
+					ev[changes].code = dev->keycode[i];
+					ev[changes].value = new_states[i];
+					changes++;
+					
 					printf("%5d: key %c %s (%d bounces)\n", valid,
 					       dev->keycode[i],
 					       new_states[i] ? "down" : "up", bounces);
 					old_states[i] = new_states[i];
-					spurious = false;
 				}
 			}
-			if (spurious) {
+			if (changes) {
+				ev[changes].type = EV_SYN;
+				ev[changes].code = SYN_REPORT;
+				ev[changes].value = 0;
+				gsize total = (changes+1) * sizeof(struct input_event);
+
+				if (write(dev->uinput_fd, ev, total) != total) {
+					err(3, "Linux uinput not okay");
+				}
+			} else {
 				// Sometimes no change occurs (button bounces without changing state)
 				printf("%5d: spurious bounce (%d bounces)\n", valid, bounces);
 			}
