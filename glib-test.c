@@ -28,19 +28,9 @@
 #include <string.h>
 #include <unistd.h>
 #include "gpio.h"
+#include "keypad.h"
 
 #define VALIDATE(e) { if (e != NULL) errx(1, "Configuration file error: %s", e->message); }
-
-struct keypad {
-	gint debounce_ms;
-	gsize rows;
-	gsize cols;
-	struct gpio *row;
-	struct gpio *col;
-	gsize keycodes;
-	gint *keycode;
-	int uinput_fd;
-};
 
 guint g_key_file_get_hexinteger (GKeyFile *key_file,
 				 const gchar *group_name,
@@ -169,6 +159,9 @@ int main(int argc, char *argv[])
 		gpio_open(dev->col+i, gpio_col_ix[i]);
 	}
 	g_free(gpio_col_ix);
+
+	keypad_setup(dev);
+	keypad_loop(dev);
 
 	return 0;
 }
