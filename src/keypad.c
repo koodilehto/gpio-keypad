@@ -48,12 +48,12 @@ void keypad_setup(struct keypad *dev)
 		gpio_write(dev->row[i].direction, "in\n");
 	}
 
+	keypad_interrupt_enable(dev);
+
 	// Column are driven open-source
 	for (gsize i=0; i<dev->cols; i++) {
 		gpio_write(dev->col[i].value, "1\n");
 	}
-
-	keypad_interrupt_enable(dev);
 }
 
 void keypad_loop(struct keypad *dev)
