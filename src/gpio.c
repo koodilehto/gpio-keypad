@@ -28,6 +28,8 @@
 #include <unistd.h>
 #include "gpio.h"
 
+#define GPIO_PATH "/sys/class/gpio/"
+
 static int gpio_open_one(char *fmt, gint value, int flags);
 
 static int gpio_open_one(char *fmt, gint value, int flags)
@@ -46,9 +48,9 @@ static int gpio_open_one(char *fmt, gint value, int flags)
 
 void gpio_open(struct gpio *gpio, gint value)
 {
-	gpio->value = gpio_open_one("/sys/class/gpio/gpio%d/value", value, O_RDWR);
-	gpio->edge = gpio_open_one("/sys/class/gpio/gpio%d/edge", value, O_WRONLY);
-	gpio->direction = gpio_open_one("/sys/class/gpio/gpio%d/direction", value, O_WRONLY);
+	gpio->value = gpio_open_one(GPIO_PATH "gpio%d/value", value, O_RDWR);
+	gpio->edge = gpio_open_one(GPIO_PATH "gpio%d/edge", value, O_WRONLY);
+	gpio->direction = gpio_open_one(GPIO_PATH "gpio%d/direction", value, O_WRONLY);
 }
 
 bool gpio_read(const int fd)
