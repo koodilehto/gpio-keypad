@@ -127,7 +127,7 @@ int main(int argc, char *argv[])
 	VALIDATE(e);
 	dev->uinput_fd = open(uinput_dev, O_WRONLY | O_NONBLOCK);
 	if (dev->uinput_fd < 0) err(1,"Opening %s failed", uinput_dev);
-	g_free(dev);
+	g_free(uinput_dev);
 
 	if ( ioctl(dev->uinput_fd, UI_SET_EVBIT, EV_KEY) == -1 ||
 	     ioctl(dev->uinput_fd, UI_SET_EVBIT, EV_SYN) == -1 ) {
