@@ -106,15 +106,15 @@ void keypad_loop(struct keypad *dev)
 
 			// The state of buttons are stable, scan. 
 			int i=0;
-			for (gsize col=0; i<dev->cols; i++) {
+			for (gsize col=0; col<dev->cols; col++) {
 				// Put all pins to floating mode except current column
-				for (gsize other_col=0; i<dev->cols; i++) {
+				for (gsize other_col=0; other_col<dev->cols; other_col++) {
 					gpio_write(dev->col[other_col].direction,
 						   col == other_col ? "out\n" : "in\n");
 				}
 				
 				// Scan
-				for (gsize row=0; i<dev->rows; row++) {
+				for (gsize row=0; row<dev->rows; row++) {
 					new_states[i++] = gpio_read(dev->row[row].value);
 				}
 			}
@@ -129,7 +129,7 @@ void keypad_loop(struct keypad *dev)
 					ev[changes].value = new_states[i];
 					changes++;
 					
-					printf("%5d: key %c %s (%d bounces)\n", valid,
+					printf("%5d: key %d %s (%d bounces)\n", valid,
 					       dev->keycode[i],
 					       new_states[i] ? "down" : "up", bounces);
 					old_states[i] = new_states[i];
