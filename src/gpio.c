@@ -1,4 +1,4 @@
-/* -*- mode: c; c-file-style: "linux"; compile-command: "scons" -*-
+/* -*- mode: c; c-file-style: "linux"; compile-command: "scons -C .." -*-
  *  vi: set shiftwidth=8 tabstop=8 noexpandtab:
  *
  *  Copyright 2015 Joel Lehtonen
