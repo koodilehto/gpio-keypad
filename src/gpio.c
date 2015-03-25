@@ -55,7 +55,7 @@ void gpio_open(struct gpio *gpio, gint value)
 
 bool gpio_read(const int fd)
 {
-	guint8 buf[2];
+	guint8 value;
 
 	// Starting from beginning
 	if (lseek(fd, 0, SEEK_SET) != 0) {
@@ -63,12 +63,12 @@ bool gpio_read(const int fd)
 	}
 
 	// Read only two bytes; binary value and newline
-	if (read(fd, buf, sizeof(buf)) != sizeof(buf)) {
+	if (read(fd, &value, 1) != 1) {
 		err(3,"Error while reading from GPIO pin");
 	}
 	
 	// Convert '0' and '1' to boolean and return
-	return buf[0] == '1';
+	return value == '1';
 }
 
 void gpio_write(const int fd, const char *value)
