@@ -148,19 +148,22 @@ int main(int argc, char *argv[])
 
 	// Open gpio pins
 
-	// FIXME export GPIO first!
+	FILE *export = fopen(GPIO_PATH "export", "w");
+	if (export == NULL) err(2,"Unable to open %s", GPIO_PATH "export");
 
 	dev->row = g_new(struct gpio, dev->rows);
 	for (gsize i=0; i<dev->rows; i++) {
-		gpio_open(dev->row+i, gpio_row_ix[i]);
+		gpio_open(export, dev->row+i, gpio_row_ix[i]);
 	}
 	g_free(gpio_row_ix);
 
 	dev->col = g_new(struct gpio, dev->cols);
 	for (gsize i=0; i<dev->cols; i++) {
-		gpio_open(dev->col+i, gpio_col_ix[i]);
+		gpio_open(export, dev->col+i, gpio_col_ix[i]);
 	}
 	g_free(gpio_col_ix);
+
+	fclose(export);
 
 	keypad_setup(dev);
 	keypad_loop(dev);

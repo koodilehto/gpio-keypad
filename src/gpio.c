@@ -28,8 +28,6 @@
 #include <unistd.h>
 #include "gpio.h"
 
-#define GPIO_PATH "/sys/class/gpio/"
-
 static int gpio_open_one(char *fmt, gint value, int flags);
 
 static int gpio_open_one(char *fmt, gint value, int flags)
@@ -46,8 +44,14 @@ static int gpio_open_one(char *fmt, gint value, int flags)
 	err(2,"Unable to open GPIO %s", pathname);
 }
 
-void gpio_open(struct gpio *gpio, gint value)
+void gpio_open(FILE* export, struct gpio *gpio, gint value)
 {
+	// Try to export it first. Export creates the GPIO files
+	int exported = fprintf(export, "%d\n", value);
+	int flushed = fflush(export);
+	printf("Export of %d %s\n", value, exported < 0 || flushed != 0 ? "failed" : "ok");
+
+	// Open value, edge and direction for given GPIO pin
 	gpio->value = gpio_open_one(GPIO_PATH "gpio%d/value", value, O_RDWR);
 	gpio->edge = gpio_open_one(GPIO_PATH "gpio%d/edge", value, O_WRONLY);
 	gpio->direction = gpio_open_one(GPIO_PATH "gpio%d/direction", value, O_WRONLY);

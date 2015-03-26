@@ -24,6 +24,8 @@
 #include <glib.h>
 #include <stdbool.h>
 
+#define GPIO_PATH "/sys/class/gpio/"
+
 struct gpio {
 	int value;
 	int edge;
@@ -33,7 +35,7 @@ struct gpio {
 /**
  * Open given GPIO pin and populate gpio structure. Dies if pin is not
  * accessible. */
-void gpio_open(struct gpio *gpio, gint value);
+void gpio_open(FILE* export, struct gpio *gpio, gint value);
 
 /**
  * Read value in given GPIO pin.
